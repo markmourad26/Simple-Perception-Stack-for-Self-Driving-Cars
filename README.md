@@ -5,9 +5,9 @@ The Project
 
 The goals / steps of this project are the following:
 
-The various steps invovled in the pipeline are as follows, each of these has also been discussed in more detail in the sub sections below:
+The various steps invovled in the pipeline are as follows:
 
-* Compute the camera calibration matrix and distortion coefficients given a set of chessboard images.
+* Compute the camera calibration matrix and distortion coefficients given a chessboard image.
 * Apply a distortion correction to raw images.
 * Apply a perspective transform to rectify image ("birds-eye view").
 * Use color transforms, gradients, etc., to create a thresholded binary image.
@@ -17,7 +17,7 @@ The various steps invovled in the pipeline are as follows, each of these has als
 * Output visual display of the lane boundaries and numerical estimation of lane curvature and vehicle position.
 
 
-The images for camera calibration are stored in the folder called `camera_cal`.  The images in `test_images` are for testing your pipeline on single frames.
+The image for camera calibration are stored in the folder called `camera_cal`.  The images in `test_images` are for testing the pipeline on single frames.
 
 ## Usage:
 

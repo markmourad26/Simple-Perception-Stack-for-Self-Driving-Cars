@@ -17,7 +17,7 @@ The various steps invovled in the pipeline are as follows:
 * Output visual display of the lane boundaries and numerical estimation of lane curvature and vehicle position.
 
 
-The image for camera calibration are stored in the folder called `camera_cal`.  The images in `test_images` are for testing the pipeline on single frames.
+The image for camera calibration is stored in the folder called `camera_cal`.  The images in `test_images` are for testing the pipeline on single frames.
 
 ## Usage:
 

@@ -1,0 +1,14 @@
+opencv-python
+docopt
+glob2
+imageio
+matplotlib
+moviepy
+numpy
+pandas
+pickle-mixin
+pillow
+requests
+scikit-image
+scipy
+seaborn

@@ -22,6 +22,7 @@ The images for camera calibration are stored in the folder called `camera_cal`. 
 ## Usage:
 
 ### 1. Set up the environment 
+#### 1.1 Using conda
 `conda env create -f environment.yml`
 
 To activate the environment:
@@ -30,10 +31,20 @@ Window: `conda activate car_env`
 
 Linux, MacOS: `source activate car_env`
 
+#### 1.2 Using pip
+Window: `pip install -r requirements.txt`
+
+Linux, MacOS: `pip install -r requirements.txt`
+
 ### 2. Run the pipeline:
+#### 2.1 Using command window
 ```bash
 python main.py INPUT_IMAGE OUTPUT_IMAGE_PATH
 python main.py --debug INPUT_IMAGE OUTPUT_IMAGE_PATH
 python main.py --video INPUT_VIDEO OUTPUT_VIDEO_PATH
 python main.py --video --debug INPUT_VIDEO OUTPUT_VIDEO_PATH
 ```
+#### 2.2 Using shell
+Window: `bash main.sh input_path output_path --video0/1 --debug0/1`
+
+Linux, MacOS: `./main.sh input_path output_path --video0/1 --debug0/1`

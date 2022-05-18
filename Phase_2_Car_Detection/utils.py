@@ -143,3 +143,163 @@ def extract_features(imgs, params):
         ))
         
     return features
+
+
+# searching for detections, Handling multiple detections and false positives
+def find_cars(img, ystart, ystop, scale, svc, scaler, orient, pix_per_cell, cell_per_block,
+              spatial_size, hist_bins, cspace):
+    '''
+    HOG Sub-sampling window search
+    
+    This function builds upon on the Sliding Window approach but instead of computing the expensive
+    HOG features for every multi-scale window, it extracts the HOG features just once and subsamples it
+    to search for detections over all the different multi-scale windows within the search area.
+    Each window is defined by a scaling factor where a scale of 1 would result in a window that's
+    8x8 cells and each cell has 8x8 pixels. The overlap of each window is in terms of the cell distance.
+    This means that a cells_per_step = 2 would result in a search window overlap of 75%.
+    
+    :param img(ndarray): Frame
+    :param ystart(int): Search area low y-coordinate 
+    :param ystop(int): Search area high y-coordinate 
+    :param scale(float): Window scale
+    :param svc(LinearSVC): Instance of the trained Linear SVC 
+    :param scaler(StandardScaler): Instance of the Standard Scaler fitted over the training set
+    :param orient(int): Number of orientation bins; param for extracting HOG features
+    :param pix_per_cell(int): Number of pixels per cell; param for extracting HOG features
+    :param cell_per_block(int): Number of cells per block; param for extracting HOG features
+    :param spatial_size((int, int)): Spatial bin size; param for extracting raw color values
+    :param hist_bins(int): Number histogram bins; param for extracting Histogram of color values
+    :param cspace(string): Color space in which to extract the features
+    :return : Tuple (List of bounding boxes of detections, Image with the detection bounding boxes drawn,
+                        Image with all the search windows drawn)
+    '''
+    
+    # Note: The number of features are maintained across the multi-scaled windows by:
+    # 1. Making sure the window size = size of the image that we trained with i.e. 64x64
+    # 2. By resizing the image to achieve the effect of larger/smaller window
+    
+    detections_img = np.copy(img)
+    draw_wins_img = np.copy(img)
+    bbox_list = []
+    
+    img = img.astype(np.float32)/255
+
+    img_tosearch = img[ystart:ystop,:,:]
+    ctrans_tosearch = convert_color(img_tosearch, cspace=cspace)
+    if scale != 1:
+        imshape = ctrans_tosearch.shape
+        ctrans_tosearch = cv2.resize(ctrans_tosearch, (np.int(imshape[1]/scale), np.int(imshape[0]/scale)))
+        
+    ch1 = ctrans_tosearch[:,:,0]
+    ch2 = ctrans_tosearch[:,:,1]
+    ch3 = ctrans_tosearch[:,:,2]
+
+    # Define blocks and steps. Note: cells > blocks > windows
+    nxblocks = (ch1.shape[1] // pix_per_cell) - cell_per_block + 1
+    nyblocks = (ch1.shape[0] // pix_per_cell) - cell_per_block + 1 
+#     nfeat_per_block = orient*cell_per_block**2
+    
+    window = 64 # 64 is the orginal sampling rate, with 8 cells and 8 pix per cell
+    nblocks_per_window = (window // pix_per_cell) - cell_per_block + 1
+    cells_per_step = 2  # Instead of overlap, define how many cells to step
+    nxsteps = (nxblocks - nblocks_per_window) // cells_per_step + 1
+    nysteps = (nyblocks - nblocks_per_window) // cells_per_step + 1
+    
+    # Compute individual channel HOG features for the entire image
+    hog1 = get_hog_features(ch1, orient, pix_per_cell, cell_per_block, feature_vec=False)
+    hog2 = get_hog_features(ch2, orient, pix_per_cell, cell_per_block, feature_vec=False)
+    hog3 = get_hog_features(ch3, orient, pix_per_cell, cell_per_block, feature_vec=False)
+    
+    for xb in range(nxsteps):
+        for yb in range(nysteps):
+            ypos = yb*cells_per_step
+            xpos = xb*cells_per_step
+            
+            # Extract HOG for this patch
+            hog_feat1 = hog1[ypos:ypos+nblocks_per_window, xpos:xpos+nblocks_per_window].ravel() 
+            hog_feat2 = hog2[ypos:ypos+nblocks_per_window, xpos:xpos+nblocks_per_window].ravel() 
+            hog_feat3 = hog3[ypos:ypos+nblocks_per_window, xpos:xpos+nblocks_per_window].ravel() 
+            hog_features = np.hstack((hog_feat1, hog_feat2, hog_feat3))
+
+            xleft = xpos*pix_per_cell
+            ytop = ypos*pix_per_cell
+
+            # Extract the image patch
+            subimg = cv2.resize(ctrans_tosearch[ytop:ytop+window, xleft:xleft+window], (64,64))
+          
+            # Get color features
+            spatial_features = bin_spatial(subimg, size=spatial_size)
+            hist_features = color_hist(subimg, nbins=hist_bins)
+
+            # Scale features and make a prediction
+            test_features = scaler.transform(np.hstack((spatial_features, hist_features, hog_features)).reshape(1, -1))    
+            test_prediction = svc.predict(test_features)
+            
+            box_left = np.int(xleft*scale)
+            box_top = np.int(ytop*scale)
+            win = np.int(window*scale)
+            bbox = ((box_left, box_top + ystart), (box_left + win, box_top + win + ystart))
+
+            cv2.rectangle(draw_wins_img, bbox[0], bbox[1], (0, 0, 255), 6) 
+            
+            # Try the decision_function here...
+            if test_prediction == 1:               
+                bbox_list.append(bbox)
+                cv2.rectangle(detections_img, bbox[0], bbox[1], (0, 0, 255), 6) 
+                
+    return bbox_list, detections_img, draw_wins_img
+
+def add_heat(heatmap, bbox_list):
+    '''
+    Function to add heat to heatmap for a list of bounding boxes
+    '''
+    
+    # Iterate through list of bboxes
+    for box in bbox_list:
+        # Add += 1 for all pixels inside each bbox
+        # Assuming each "box" takes the form ((x1, y1), (x2, y2))
+        heatmap[box[0][1]:box[1][1], box[0][0]:box[1][0]] += 1
+
+    return heatmap
+    
+def apply_threshold(heatmap, threshold):
+    '''
+    Function that zeros out all the pixels in a heatmap that are below a user defined threshold
+    '''
+    
+    heatmap[heatmap <= threshold] = 0
+    return heatmap
+
+def add_heat_and_threshold(img, bboxes):
+    heatmap = np.zeros_like(img[:,:,0], dtype=np.float)
+    heatmap = add_heat(heatmap, bboxes)
+    heatmap = apply_threshold(heatmap, 3)
+    heatmap = np.clip(heatmap, 0, 255)
+    labels = label(heatmap)
+    _, thresh_bboxes = draw_labeled_bboxes(np.copy(img), labels)
+    return thresh_bboxes, heatmap
+
+def draw_labeled_bboxes(img, labels):
+    '''
+    Function that takes in the labelled detections in a heatmap and puts bounding
+    boxes in the original image around the labelled regions.
+    '''
+    
+    bboxes = []
+    for car_number in range(1, labels[1]+1):
+        # Find pixels with each car_number label value
+        nonzero = (labels[0] == car_number).nonzero()
+        
+        # Identify x and y values of those pixels
+        nonzeroy = np.array(nonzero[0])
+        nonzerox = np.array(nonzero[1])
+        
+        # Define a bounding box based on min/max x and y
+        bbox = ((np.min(nonzerox), np.min(nonzeroy)), (np.max(nonzerox), np.max(nonzeroy)))
+        
+        # Draw the box on the image
+        cv2.rectangle(img, bbox[0], bbox[1], (0, 0, 255), 6)
+        bboxes.append(bbox)
+        
+    return img, bboxes
+

@@ -3,7 +3,7 @@
 clear
 
 echo "Starting.."
-if [$3 == "--debug0" ]
+if [ $3 == "--debug0" ]
 then
     python main.py $1 $2
 elif [ $3 == "--debug1" ]

@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 from skimage.feature import hog
 import matplotlib.image as mpimg
-
+from scipy.ndimage.measurements import label
 
 def draw_boxes(img, bboxes, color=(0, 0, 255), thick=6):
     # Make a copy of the image
